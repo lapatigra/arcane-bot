@@ -188,6 +188,8 @@
             border: 1px solid var(--line);
         }
         .contact-item i { font-size: 17px; color: var(--rose); }
+        /* нечётное число кнопок: последняя на всю ширину */
+        .contact-item:last-child:nth-child(odd) { grid-column: span 2; }
 
         footer { text-align: center; padding: 10px 20px 30px; color: rgba(243, 227, 214, 0.35); font-size: 0.78em; }
 
@@ -516,7 +518,8 @@
 
     const ICONS = {
         music: 'fas fa-music', instagram: 'fab fa-instagram', vk: 'fab fa-vk',
-        telegram: 'fab fa-telegram', youtube: 'fab fa-youtube', link: 'fas fa-link',
+        telegram: 'fab fa-telegram', youtube: 'fab fa-youtube', tiktok: 'fab fa-tiktok',
+        email: 'fas fa-envelope', link: 'fas fa-link',
     };
     if (CONFIG.contacts.length) {
         $('contactsBlock').style.display = 'block';

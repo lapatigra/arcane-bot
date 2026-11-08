@@ -30,9 +30,13 @@ const CONFIG = {
     schedule: [],
 
     // Соцсети. Пустой список — блок «Контакты» не показываем.
-    // icon: music | instagram | vk | telegram | youtube | link
+    // icon: music | instagram | vk | telegram | youtube | tiktok | email | link
     contacts: [
-        // { title: 'Instagram', url: 'https://instagram.com/...', icon: 'instagram' },
+        { title: 'Instagram', url: 'https://www.instagram.com/arcane__band', icon: 'instagram' },
+        { title: 'TikTok', url: 'https://www.tiktok.com/@arcane__band', icon: 'tiktok' },
+        { title: 'YouTube', url: 'https://youtube.com/@arcane__band', icon: 'youtube' },
+        { title: 'ВКонтакте', url: 'https://vk.ru/arcane_band', icon: 'vk' },
+        { title: 'Почта', url: 'mailto:arcanecoverband@gmail.com', icon: 'email' },
     ],
 
     // Репертуар: раздел -> песни в формате «Исполнитель - Песня»
