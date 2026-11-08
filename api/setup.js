@@ -3,7 +3,8 @@
 // Безопасно открывать сколько угодно раз: вебхук всегда ставится на этот же сайт.
 module.exports = async (req, res) => {
     const token = process.env.BOT_TOKEN;
-    const site = (process.env.WEBAPP_URL || `https://${req.headers.host}`).replace(/\/+$/, '');
+    // Адрес сайта берём из самого запроса — по нему страницу и открыли, опечатки тут не бывает.
+    const site = `https://${req.headers['x-forwarded-host'] || req.headers.host}`;
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
 
     if (!token) return res.status(500).send('Не задан BOT_TOKEN в настройках Vercel (и после добавления нужен Redeploy).');
@@ -33,6 +34,7 @@ module.exports = async (req, res) => {
 
     res.status(hook.ok ? 200 : 500).send(
         `Бот: @${me.result.username}\n` +
+        `Сайт: ${site}\n` +
         `Подключение к сайту: ${hook.ok ? 'готово' : 'ошибка — ' + hook.description}\n` +
         `Кнопка меню: ${menu.ok ? 'готово' : 'ошибка — ' + menu.description}\n\n` +
         (hook.ok ? `Откройте https://t.me/${me.result.username} и нажмите Start.` : '')

@@ -35,7 +35,6 @@ Telegram открывает мини-апп по любому https-адресу
    этот репозиторий → Deploy. В Settings → Environment Variables добавить:
    - `BOT_TOKEN` — токен бота;
    - `OWNER_CHAT_ID` — chat id из шага 2;
-   - `WEBAPP_URL` — адрес сайта, например `https://arcane-bot.vercel.app`.
    После добавления переменных — Deployments → Redeploy.
 4. **Подключить бота к сайту.** Открыть в браузере `<АДРЕС>/api/setup`
    (например `https://arcane-bot-gamma.vercel.app/api/setup`). Страница сама

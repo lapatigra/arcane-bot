@@ -16,7 +16,8 @@ module.exports = async (req, res) => {
                 reply_markup: {
                     inline_keyboard: [[{
                         text: `Заказать песню — ${CONFIG.price} ₽`,
-                        web_app: { url: process.env.WEBAPP_URL },
+                        // адрес сайта = тот, на который Telegram прислал этот запрос
+                        web_app: { url: `https://${req.headers['x-forwarded-host'] || req.headers.host}` },
                     }]],
                 },
             }),
