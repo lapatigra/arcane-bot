@@ -37,10 +37,9 @@ Telegram открывает мини-апп по любому https-адресу
    - `OWNER_CHAT_ID` — chat id из шага 2;
    - `WEBAPP_URL` — адрес сайта, например `https://arcane-bot.vercel.app`.
    После добавления переменных — Deployments → Redeploy.
-4. **Вебхук.** Открыть в браузере (подставив токен и адрес):
-   `https://api.telegram.org/bot<ТОКЕН>/setWebhook?url=<АДРЕС>/api/webhook`
-5. **Кнопка меню (по желанию).** @BotFather → /mybots → бот → Bot Settings →
-   Menu Button → указать тот же адрес.
+4. **Подключить бота к сайту.** Открыть в браузере `<АДРЕС>/api/setup`
+   (например `https://arcane-bot-gamma.vercel.app/api/setup`). Страница сама
+   поставит вебхук и кнопку меню, токен вручную вставлять не нужно.
 
 Дальше любая правка в GitHub (`config.js`, фото) сама выкладывается на Vercel.
 
