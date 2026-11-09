@@ -471,6 +471,7 @@
         <div class="user-badge" id="userBadge"><i class="fab fa-telegram"></i><span id="userBadgeText"></span></div>
         <div class="pay-amount" id="payAmount"></div>
         <div class="pay-label">Поздравление</div>
+        <div id="payError" style="color:#e8a0a8;font-size:0.85em;margin:0 0 12px;text-align:center"></div>
         <button class="btn btn-primary" id="payBtn" style="width:100%;padding:17px;font-size:15px">Оформить заказ</button>
         <button class="btn btn-ghost" id="backToGreeting" style="width:100%;margin-top:10px">Назад</button>
     </div>
@@ -659,20 +660,33 @@
     $('payBtn').onclick = async function () {
         this.disabled = true;
         this.textContent = 'Отправка...';
-        try {
-            await fetch('/api/notify', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    song: selectedSong,
-                    greeting: $('greetingText').value.trim(),
-                    contact: $('contactInput').value.trim(),
-                    initData: launchData,
-                    user: tgUser,
-                }),
-            });
-        } catch (e) {
-            console.error('notify', e);
+        $('payError').textContent = '';
+        const body = JSON.stringify({
+            song: selectedSong,
+            greeting: $('greetingText').value.trim(),
+            contact: $('contactInput').value.trim(),
+            initData: launchData,
+            user: tgUser,
+        });
+        // Две попытки: сеть бывает капризной. Успех — только если сервер подтвердил.
+        let sent = false;
+        for (let i = 0; i < 2 && !sent; i++) {
+            try {
+                const ctrl = new AbortController();
+                const timer = setTimeout(() => ctrl.abort(), 15000);
+                const r = await fetch((CONFIG.apiUrl || '').replace(/\/+$/, '') + '/api/notify', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body, signal: ctrl.signal,
+                });
+                clearTimeout(timer);
+                sent = r.ok;
+            } catch (e) { console.error('notify', e); }
+        }
+        if (!sent) {
+            // Не говорим «заказ отправлен», если он не дошёл: человек должен знать и повторить
+            this.disabled = false;
+            this.textContent = 'Оформить заказ';
+            $('payError').textContent = 'Не удалось отправить заказ. Проверьте интернет и нажмите ещё раз. Если не получится — напишите нам в соцсетях.';
+            return;
         }
         hideAll();
         $('success').classList.add('active');

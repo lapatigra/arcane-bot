@@ -20,9 +20,27 @@ function verifyInitData(initData, botToken) {
     try { return JSON.parse(params.get('user') || 'null'); } catch { return null; }
 }
 
+// Страница может лежать на другом хостинге (в России), а приём заказов здесь.
+// Тогда браузер шлёт запрос с чужого адреса, и ему нужно явно разрешить это.
+const ALLOWED_ORIGINS = [CONFIG.siteUrl, 'https://arcane.tigratime.ru']
+    .filter(Boolean).map(u => u.replace(/\/+$/, ''));
+
+function allowCors(req, res) {
+    const origin = req.headers.origin;
+    if (origin && ALLOWED_ORIGINS.includes(origin)) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Vary', 'Origin');
+        res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+        res.setHeader('Access-Control-Max-Age', '86400');
+    }
+}
+
 const clip = (s, n) => String(s || '').trim().slice(0, n);
 
 module.exports = async (req, res) => {
+    allowCors(req, res);
+    if (req.method === 'OPTIONS') return res.status(204).end();
     if (req.method !== 'POST') return res.status(405).end();
 
     const BOT_TOKEN = process.env.BOT_TOKEN;
