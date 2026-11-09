@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Диагностика загрузки</title>
+<style>
+    body { font: 15px/1.5 -apple-system, Helvetica, Arial, sans-serif; background: #120305; color: #f3e3d6; margin: 0; padding: 16px; }
+    h1 { font-size: 18px; margin: 0 0 4px; }
+    .note { color: #d9939b; margin-bottom: 14px; font-size: 13px; }
+    table { width: 100%; border-collapse: collapse; }
+    td { padding: 7px 4px; border-bottom: 1px solid rgba(217,147,155,.25); vertical-align: top; }
+    td:first-child { width: 52%; word-break: break-all; font-size: 13px; }
+    .ok { color: #8fd18f; } .bad { color: #ff8a8a; font-weight: 700; } .wait { color: #aaa; }
+    #sum { margin-top: 16px; padding: 12px; border: 1px solid rgba(217,147,155,.4); border-radius: 12px; white-space: pre-line; }
+</style>
+</head>
+<body>
+<h1>Диагностика загрузки</h1>
+<div class="note" id="env"></div>
+<table id="t"></table>
+<div id="sum">Идёт проверка, подождите около минуты…</div>
+
+<script>
+const TIMEOUT = 10000;
+const rows = [];
+
+document.getElementById('env').textContent =
+    (location.hash.includes('tgWebAppData') ? 'открыто внутри Telegram' : 'открыто в браузере') +
+    ' · ' + location.host + ' · ' + new Date().toLocaleTimeString();
+
+function addRow(label) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = '<td></td><td class="wait">ждём…</td>';
+    tr.children[0].textContent = label;
+    document.getElementById('t').appendChild(tr);
+    return tr.children[1];
+}
+
+// Скачать файл целиком и посмотреть, сколько байт реально дошло и за сколько
+async function download(url) {
+    const t0 = performance.now();
+    const ctrl = new AbortController();
+    let got = 0;
+    const timer = setTimeout(() => ctrl.abort(), TIMEOUT);
+    try {
+        const r = await fetch(url + (url.includes('?') ? '&' : '?') + 'd=' + Date.now(), { signal: ctrl.signal, cache: 'no-store' });
+        const reader = r.body.getReader();
+        for (;;) { const { done, value } = await reader.read(); if (done) break; got += value.length; }
+        clearTimeout(timer);
+        return { ok: r.ok, ms: performance.now() - t0, kb: got / 1024, note: r.ok ? '' : 'HTTP ' + r.status };
+    } catch (e) {
+        clearTimeout(timer);
+        return { ok: false, ms: performance.now() - t0, kb: got / 1024, note: e.name === 'AbortError' ? 'ТАЙМАУТ: завис' : 'ОШИБКА: ' + e.message };
+    }
+}
+
+// Подключить стиль целиком (завершится, только когда придёт весь файл)
+function loadCss(url) {
+    return new Promise(resolve => {
+        const t0 = performance.now();
+        const l = document.createElement('link');
+        l.rel = 'stylesheet'; l.media = 'print'; l.href = url;
+        const timer = setTimeout(() => { l.remove(); resolve({ ok: false, ms: performance.now() - t0, note: 'ТАЙМАУТ: завис' }); }, TIMEOUT);
+        l.onload = () => { clearTimeout(timer); resolve({ ok: true, ms: performance.now() - t0 }); };
+        l.onerror = () => { clearTimeout(timer); resolve({ ok: false, ms: performance.now() - t0, note: 'ОШИБКА' }); };
+        document.head.appendChild(l);
+    });
+}
+
+// Только узнать, отвечает ли сервер (тело не читаем: чужой сервер не разрешает)
+async function ping(url) {
+    const t0 = performance.now();
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), TIMEOUT);
+    try {
+        await fetch(url, { mode: 'no-cors', signal: ctrl.signal, cache: 'no-store' });
+        clearTimeout(timer);
+        return { ok: true, ms: performance.now() - t0 };
+    } catch (e) {
+        clearTimeout(timer);
+        return { ok: false, ms: performance.now() - t0, note: e.name === 'AbortError' ? 'ТАЙМАУТ: не отвечает' : 'ОШИБКА' };
+    }
+}
+
+const tests = [
+    ['Сайт: config.js (20 КБ)',            () => download('/config.js')],
+    ['Сайт: фото шапки (86 КБ)',           () => download('/photos/hero.jpg')],
+    ['Сайт: большое фото (441 КБ)',        () => download('/photos/arcane-42.jpg')],
+    ['Старый адрес vercel.app: фото (441 КБ)', () => download('https://arcane-bot-gamma.vercel.app/photos/arcane-42.jpg')],
+    ['Иконки cdnjs.cloudflare.com (CSS)',  () => loadCss('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css')],
+    ['Шрифты fonts.googleapis.com (CSS)',  () => loadCss('https://fonts.googleapis.com/css2?family=Montserrat:wght@400&display=swap')],
+    ['Файл шрифта иконок (cdnjs)',         () => ping('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/webfonts/fa-solid-900.woff2')],
+    ['Скрипт telegram.org',                () => ping('https://telegram.org/js/telegram-web-app.js')],
+];
+
+(async () => {
+    const lines = [];
+    for (const [label, fn] of tests) {
+        const cell = addRow(label);
+        const r = await fn();
+        const kb = r.kb != null ? ', ' + r.kb.toFixed(0) + ' КБ' : '';
+        cell.className = r.ok ? 'ok' : 'bad';
+        cell.textContent = (r.ok ? 'OK ' : '') + (r.note ? r.note + ' · ' : '') + (r.ms / 1000).toFixed(1) + ' с' + kb;
+        lines.push({ label, ...r });
+    }
+    const bad = lines.filter(l => !l.ok);
+    document.getElementById('sum').textContent = bad.length
+        ? 'Не прошло: ' + bad.length + ' из ' + lines.length + '\n' + bad.map(b => '• ' + b.label + ' — ' + (b.note || 'ошибка')).join('\n')
+        : 'Всё загрузилось без зависаний.';
+})();
+</script>
+</body>
+</html>
