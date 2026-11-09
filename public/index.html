@@ -5,7 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#120305">
     <title>Заказ песни</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- фото шапки начинает грузиться сразу, не дожидаясь остального -->
+    <link rel="preload" as="image" href="photos/hero.jpg" fetchpriority="high">
+    <!-- async: страница не ждёт telegram.org (из России в браузере он бывает медленным).
+         Когда скрипт догрузится, вызывается onTelegramReady. -->
+    <script src="https://telegram.org/js/telegram-web-app.js" async onload="window.onTelegramReady && window.onTelegramReady()"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Montserrat:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -383,7 +387,7 @@
 
 <div id="app">
     <div class="hero">
-        <img id="heroImg" alt="">
+        <img id="heroImg" src="photos/hero.jpg" alt="" fetchpriority="high">
         <div class="hero-overlay">
             <div class="hero-name" id="heroName"></div>
             <button class="btn-main" id="openOrderBtn">Заказать песню</button>
@@ -483,16 +487,28 @@
 
 <script src="config.js"></script>
 <script>
+(() => {
     const $ = id => document.getElementById(id);
 
-    const tg = window.Telegram?.WebApp;
-    if (tg) {
+    // Открыто ли внутри Telegram — видно по адресу сразу, без скрипта telegram.org:
+    // Telegram всегда передаёт данные запуска в #tgWebAppData.
+    const launchData = new URLSearchParams(location.hash.slice(1)).get('tgWebAppData') || '';
+    const inTelegram = !!launchData || !!window.TelegramWebviewProxy;
+    let tg = null;
+    let tgUser = null;
+    try { tgUser = JSON.parse(new URLSearchParams(launchData).get('user') || 'null'); } catch (e) {}
+
+    // Скрипт Telegram догрузился: разворачиваем окно, красим шапку, берём данные гостя
+    window.onTelegramReady = () => {
+        tg = window.Telegram?.WebApp || null;
+        if (!tg) return;
         tg.ready();
         tg.expand();
         tg.setHeaderColor('#120305');
         tg.setBackgroundColor('#120305');
-    }
-    const tgUser = tg?.initDataUnsafe?.user || null;
+        tgUser = tg.initDataUnsafe?.user || tgUser;
+        showUserBadge();
+    };
 
     // ---------- Наполнение из настроек ----------
     document.title = CONFIG.name + ' — заказ песни';
@@ -539,17 +555,20 @@
     }
 
     // На обычном сайте (не в Telegram) спрашиваем, как связаться с гостем
-    if (!tgUser) $('contactBox').style.display = 'block';
-    if (!tg?.initData && CONFIG.botUsername) {
+    if (!inTelegram) $('contactBox').style.display = 'block';
+    if (!inTelegram && CONFIG.botUsername) {
         $('tgLink').href = 'https://t.me/' + CONFIG.botUsername;
         $('tgLinkBox').style.display = 'block';
     }
 
-    if (tgUser) {
+    function showUserBadge() {
+        if (!tgUser) return;
         const name = tgUser.first_name + (tgUser.last_name ? ' ' + tgUser.last_name : '');
         $('userBadgeText').textContent = name + (tgUser.username ? ' · @' + tgUser.username : '');
         $('userBadge').style.display = 'flex';
     }
+    showUserBadge();
+    if (window.Telegram?.WebApp) window.onTelegramReady();  // скрипт успел раньше нас
 
     // ---------- Вкладки ----------
     document.querySelectorAll('.tab').forEach(tab => {
@@ -611,7 +630,7 @@
     $('backToList').onclick = () => show('songModal');
     $('toPayment').onclick = () => {
         const need = !$('greetingText').value.trim() ? 'Напишите, пожалуйста, текст поздравления'
-            : (!tgUser && !$('contactInput').value.trim()) ? 'Оставьте телефон или ник в Telegram, чтобы мы могли с вами связаться'
+            : (!inTelegram && !$('contactInput').value.trim()) ? 'Оставьте телефон или ник в Telegram, чтобы мы могли с вами связаться'
             : '';
         if (need) {
             tg?.showAlert ? tg.showAlert(need) : alert(need);
@@ -632,7 +651,7 @@
                     song: selectedSong,
                     greeting: $('greetingText').value.trim(),
                     contact: $('contactInput').value.trim(),
-                    initData: tg?.initData || '',
+                    initData: tg?.initData || launchData,
                     user: tgUser,
                 }),
             });
@@ -690,6 +709,7 @@
         if (e.key === 'ArrowLeft') openViewer(current - 1);
         if (e.key === 'ArrowRight') openViewer(current + 1);
     });
+})();
 </script>
 </body>
 </html>
