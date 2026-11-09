@@ -7,13 +7,19 @@
     <title>Заказ песни</title>
     <!-- фото шапки начинает грузиться сразу, не дожидаясь остального -->
     <link rel="preload" as="image" href="photos/hero.jpg" fetchpriority="high">
-    <!-- async: страница не ждёт telegram.org (из России в браузере он бывает медленным).
-         Когда скрипт догрузится, вызывается onTelegramReady. -->
-    <script src="https://telegram.org/js/telegram-web-app.js" async onload="window.onTelegramReady && window.onTelegramReady()"></script>
+    <!-- Скрипт telegram.org НЕ подключаем: из России он часто не грузится, а Telegram держит
+         заставку загрузки, пока страница не скажет «готово». Все команды Telegram шлём напрямую
+         (см. TG ниже), данные гостя берём из адреса. -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Montserrat:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <!-- Шрифты и иконки подгружаются в фоне (media=print -> all): если сервер недоступен,
+         страница всё равно открывается, просто с обычным шрифтом. -->
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Montserrat:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" media="print" onload="this.media='all'">
+    <noscript>
+        <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Montserrat:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    </noscript>
     <style>
         /* ---------- Палитра: бургунди ---------- */
         :root {
@@ -451,6 +457,7 @@
         <div class="search-box" id="contactBox" style="display:none;margin:10px 0 0">
             <input type="text" id="contactInput" maxlength="100" placeholder="Ваш телефон или ник в Telegram">
         </div>
+        <div id="formError" style="color:#e8a0a8;font-size:0.85em;margin-top:10px;text-align:center;min-height:1.2em"></div>
         <div class="button-group">
             <button class="btn btn-ghost" id="backToList">Назад</button>
             <button class="btn btn-primary" id="toPayment">Далее</button>
@@ -471,7 +478,7 @@
 
 <!-- Готово -->
 <div class="success" id="success">
-    <i class="fas fa-check-circle"></i>
+    <i>&#10003;</i>
     <h2>Заказ отправлен</h2>
     <p id="successText"></p>
 </div>
@@ -479,9 +486,9 @@
 <!-- Просмотр фото -->
 <div class="viewer" id="viewer">
     <img id="viewerImg" alt="">
-    <button class="viewer-btn viewer-close" id="viewerClose" aria-label="Закрыть"><i class="fas fa-xmark"></i></button>
-    <button class="viewer-btn viewer-prev" id="viewerPrev" aria-label="Назад"><i class="fas fa-chevron-left"></i></button>
-    <button class="viewer-btn viewer-next" id="viewerNext" aria-label="Вперёд"><i class="fas fa-chevron-right"></i></button>
+    <button class="viewer-btn viewer-close" id="viewerClose" aria-label="Закрыть">&times;</button>
+    <button class="viewer-btn viewer-prev" id="viewerPrev" aria-label="Назад">&#8249;</button>
+    <button class="viewer-btn viewer-next" id="viewerNext" aria-label="Вперёд">&#8250;</button>
     <div class="viewer-count" id="viewerCount"></div>
 </div>
 
@@ -494,21 +501,33 @@
     // Telegram всегда передаёт данные запуска в #tgWebAppData.
     const launchData = new URLSearchParams(location.hash.slice(1)).get('tgWebAppData') || '';
     const inTelegram = !!launchData || !!window.TelegramWebviewProxy;
-    let tg = null;
     let tgUser = null;
     try { tgUser = JSON.parse(new URLSearchParams(launchData).get('user') || 'null'); } catch (e) {}
 
-    // Скрипт Telegram догрузился: разворачиваем окно, красим шапку, берём данные гостя
-    window.onTelegramReady = () => {
-        tg = window.Telegram?.WebApp || null;
-        if (!tg) return;
-        tg.ready();
-        tg.expand();
-        tg.setHeaderColor('#120305');
-        tg.setBackgroundColor('#120305');
-        tgUser = tg.initDataUnsafe?.user || tgUser;
-        showUserBadge();
-    };
+    // Команды клиенту Telegram — тем же способом, что и telegram-web-app.js, но без самого скрипта.
+    function tgPost(type, data) {
+        try {
+            if (window.TelegramWebviewProxy?.postEvent) {            // iOS, Android, десктоп
+                window.TelegramWebviewProxy.postEvent(type, JSON.stringify(data || {}));
+                return true;
+            }
+            if (window.external && 'notify' in window.external) {    // Windows
+                window.external.notify(JSON.stringify({ eventType: type, eventData: data || {} }));
+                return true;
+            }
+            if (window.parent !== window) {                          // Telegram Web
+                window.parent.postMessage(JSON.stringify({ eventType: type, eventData: data || {} }), '*');
+                return true;
+            }
+        } catch (e) { console.error('tgPost', e); }
+        return false;
+    }
+    if (inTelegram) {
+        tgPost('web_app_ready');                  // убрать заставку загрузки — сразу, ничего не ждём
+        tgPost('web_app_expand');                 // развернуть на всю высоту
+        tgPost('web_app_set_header_color', { color: '#120305' });
+        tgPost('web_app_set_background_color', { color: '#120305' });
+    }
 
     // ---------- Наполнение из настроек ----------
     document.title = CONFIG.name + ' — заказ песни';
@@ -568,7 +587,6 @@
         $('userBadge').style.display = 'flex';
     }
     showUserBadge();
-    if (window.Telegram?.WebApp) window.onTelegramReady();  // скрипт успел раньше нас
 
     // ---------- Вкладки ----------
     document.querySelectorAll('.tab').forEach(tab => {
@@ -632,10 +650,8 @@
         const need = !$('greetingText').value.trim() ? 'Напишите, пожалуйста, текст поздравления'
             : (!inTelegram && !$('contactInput').value.trim()) ? 'Оставьте телефон или ник в Telegram, чтобы мы могли с вами связаться'
             : '';
-        if (need) {
-            tg?.showAlert ? tg.showAlert(need) : alert(need);
-            return;
-        }
+        $('formError').textContent = need;
+        if (need) return;
         show('paymentModal');
     };
     $('backToGreeting').onclick = () => show('greetingModal');
@@ -651,7 +667,7 @@
                     song: selectedSong,
                     greeting: $('greetingText').value.trim(),
                     contact: $('contactInput').value.trim(),
-                    initData: tg?.initData || launchData,
+                    initData: launchData,
                     user: tgUser,
                 }),
             });
@@ -662,8 +678,9 @@
         $('success').classList.add('active');
         if (CONFIG.paymentUrl) {
             setTimeout(() => {
-                if (tg?.openLink) tg.openLink(CONFIG.paymentUrl);
-                else window.location.href = CONFIG.paymentUrl;
+                if (!(inTelegram && tgPost('web_app_open_link', { url: CONFIG.paymentUrl }))) {
+                    window.location.href = CONFIG.paymentUrl;
+                }
             }, 2000);
         }
     };
