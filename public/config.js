@@ -16,6 +16,9 @@ const CONFIG = {
     // сюда пишется адрес приёма, например 'https://arcane-api.tigratime.ru'.
     apiUrl: '',
 
+    // Запасной приём заказов: если первая попытка не прошла, вторая идёт сюда.
+    apiFallback: 'https://arcane.tigratime.ru',
+
     // Цена заказа в рублях
     price: 1000,
 
