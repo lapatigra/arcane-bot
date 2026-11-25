@@ -25,7 +25,7 @@ const CONFIG = {
 
     // Ссылка на оплату (Яндекс Чаевые и т.п.). Пусто — после заказа
     // покажем «Заказ отправлен», а оплату артист попросит сам.
-    paymentUrl: 'https://tips.yandex.ru/guest/payment/4078527',
+    paymentUrl: 'https://tips.yandex.ru/guest/payment/4078527?amount=1000&reload=1',
 
     // Фото в шапке (файл в public/photos)
     heroPhoto: 'photos/hero.jpg',
