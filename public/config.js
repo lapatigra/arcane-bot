@@ -419,3 +419,5 @@ const CONFIG = {
         ]},
     ],
 };
+
+if (typeof module !== 'undefined') module.exports = CONFIG;
